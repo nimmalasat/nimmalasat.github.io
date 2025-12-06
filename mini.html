@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoSort AI</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- TensorFlow.js and COCO-SSD for AI Detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2"></script>
+    <!-- Use Inter font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            touch-action: pan-y;
+        }
+        .screen {
+            min-height: calc(100vh - 4rem);
+            padding-bottom: 4rem;
+        }
+        .animate-spin-slow {
+            animation: spin 1.5s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        #detectionCanvas {
+            max-width: 100%;
+            margin: 0.5rem auto;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <div id="app" class="max-w-xl mx-auto min-h-screen flex flex-col">
+        <!-- Header -->
+        <header id="header" class="p-4 bg-white shadow-lg sticky top-0 z-10">
+            <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 text-green-600"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M10 11v6M14 11v6"></path></svg>
+                EcoSort AI
+            </h1>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="content" class="flex-grow overflow-y-auto"></main>
+
+        <!-- Mobile Navigation Bar -->
+        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl z-20">
+            <div class="flex justify-around items-center h-16 max-w-xl mx-auto">
+                <button onclick="navigateTo('Camera')" id="nav-Camera" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                    <span class="text-xs font-medium mt-1">Scan</span>
+                </button>
+                <button onclick="navigateTo('Browse')" id="nav-Browse" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <span class="text-xs font-medium mt-1">Guide</span>
+                </button>
+                <button onclick="navigateTo('History')" id="nav-History" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M21 12H3"/><path d="M10 2l2 4M12 4l2-4"/><path d="M10 22l2-4M12 20l2 4"/></svg>
+                    <span class="text-xs font-medium mt-1">History</span>
+                </button>
+                <button onclick="navigateTo('Stats')" id="nav-Stats" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v2"/></svg>
+                    <span class="text-xs font-medium mt-1">Impact</span>
+                </button>
+                <button onclick="navigateTo('Settings')" id="nav-Settings" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 1-.44 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 1-2 2H2m20-11.56v.44a2 2 0 0 1 2 2h.44a2 2 0 0 0 2 2v.44a2 2 0 0 1 2 2h.44a2 2 0 0 0 2 2v.44a2 2 0 0 1-2 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 1-2 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 1-2 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 1-2 2H2"/><circle cx="12" cy="12" r="3"/></svg>
+                    <span class="text-xs font-medium mt-1">Settings</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        // Global variable for AI model
+        let cocoModel = null;
+        let modelLoading = false;
+
+        // Data Structures
+        let currentScreen = 'Camera';
+        let classificationResult = null;
+        let history = JSON.parse(localStorage.getItem('ecoSortHistory') || '[]');
+        let stats = JSON.parse(localStorage.getItem('ecoSortStats') || '{}');
+        let selectedImageUrl = null;
+
+        // Waste Database with ENHANCED keywords for better AI matching
+        const WASTE_DATABASE = [
+            // RECYCLABLE
+            { name: "Plastic Bottle", category: "Recyclable", material: "Plastic (PET #1)", prep: "Rinse thoroughly to remove all residue. Flatten if possible.", instructions: "Accepted in most municipal blue/green bin programs. *Remove cap* (caps are often non-recyclable or too small to process).", mistake: "Leaving liquid inside. Forgetting to remove the cap.", color: 'bg-blue-600', text: 'text-blue-600', keywords: ['bottle', 'plastic', 'plastic bottle', 'beverage bottle', 'water bottle', 'soda bottle', 'pet bottle', 'crushed bottle', 'empty bottle'] },
+            { name: "Aluminum Beverage Can", category: "Recyclable", material: "Metal (Aluminum)", prep: "Empty completely. Rinsing is highly recommended to prevent odor/pests.", instructions: "Highly valuable and infinitely recyclable. Accepted universally.", mistake: "Not emptying the contents (contaminates metal recycling).", color: 'bg-green-600', text: 'text-green-600', keywords: ['can', 'aluminum can', 'soda can', 'beer can', 'metal can', 'drink can', 'empty can'] },
+            { name: "Newspaper / Office Paper", category: "Recyclable", material: "Paper Fiber", prep: "Ensure it is clean and dry. No shredding necessary.", instructions: "Accepted widely. Must be loose, not bundled or bagged.", mistake: "Trying to recycle paper towels, which should be composted.", color: 'bg-yellow-600', text: 'text-yellow-600', keywords: ['newspaper', 'paper', 'document', 'sheet', 'printed paper', 'office paper', 'magazine'] },
+            { name: "Glass Jar / Bottle", category: "Recyclable", material: "Glass", prep: "Rinse well. Remove the lid/cap (recycle metal/plastic lid separately if possible).", instructions: "Check local rules for color sorting (clear, green, brown). Label removal is not required.", mistake: "Putting broken window glass or ceramics (trash) in the glass bin.", color: 'bg-teal-600', text: 'text-teal-600', keywords: ['glass', 'jar', 'glass bottle', 'container', 'wine glass', 'drinking glass', 'glass jar'] },
+            { name: "Cardboard Box", category: "Recyclable", material: "Paper (Corrugated)", prep: "Remove all packaging tape and plastic strapping. Flatten the box.", instructions: "Must be clean, dry, and flattened. Accepted in all programs.", mistake: "Recycling boxes contaminated with oil, food, or moisture.", color: 'bg-orange-600', text: 'text-orange-600', keywords: ['box', 'cardboard', 'package', 'carton', 'shipping box', 'corrugated', 'packaging box'] },
+            // COMPOSTABLE
+            { name: "Banana Peel / Apple Core", category: "Compostable", material: "Organic Matter", prep: "No preparation needed. Can be added directly to a compost pile or municipal organic bin.", instructions: "Should be composted to create nutrient-rich soil.", mistake: "Putting meat, bones, or dairy in the compost bin (municipal programs usually forbid this).", color: 'bg-lime-600', text: 'text-lime-600', keywords: ['apple', 'banana', 'fruit', 'peel', 'core', 'organic', 'food waste', 'fruit peel'] },
+            { name: "Coffee Grounds / Tea Bags", category: "Compostable", material: "Organic Matter", prep: "Remove staples from tea bags. Ensure coffee filters are plain paper (no plastic lining).", instructions: "Excellent addition to any compost system.", mistake: "Composting K-Cups or plastic-lined single-serve coffee pods.", color: 'bg-lime-700', text: 'text-lime-700', keywords: ['coffee', 'tea', 'grounds', 'bag', 'tea bag', 'coffee filter', 'beverage'] },
+            // RESIDUAL/TRASH
+            { name: "Greasy Pizza Box", category: "Residual/Trash", material: "Contaminated Cardboard", prep: "If only the lid is clean, tear it off and recycle the clean portion. Throw the greasy bottom away.", instructions: "Oil contaminates paper fibers, making the whole batch unrecyclable. Must go to landfill/trash.", mistake: "Recycling the whole box thinking it's 'just paper'.", color: 'bg-red-600', text: 'text-red-600', keywords: ['pizza', 'food', 'greasy', 'oily', 'contaminated', 'pizza box'] },
+            { name: "Plastic Grocery Bag", category: "Residual/Trash", material: "Plastic (Film)", prep: "Must be clean and dry. Do NOT put in curbside bin.", instructions: "Usually jams recycling machinery. *Must be taken to special store drop-off locations* or put in residual trash.", mistake: "Placing bags in the recycling bin—they are a major contaminant!", color: 'bg-gray-600', text: 'text-gray-600', keywords: ['bag', 'plastic bag', 'shopping bag', 'grocery bag', 'film', 'plastic film'] },
+            { name: "Styrofoam (Packing Peanuts)", category: "Residual/Trash", material: "Polystyrene (PS #6)", prep: "Bag securely to prevent flying away.", instructions: "Not accepted in most curbside recycling due to bulkiness and fragility. Must go to specialized facilities or trash.", mistake: "Putting loose peanuts in the recycling bin.", color: 'bg-gray-700', text: 'text-gray-700', keywords: ['styrofoam', 'packing', 'foam', 'peanuts', 'polystyrene', 'expanded polystyrene'] },
+            { name: "Broken Ceramic Mug", category: "Residual/Trash", material: "Ceramic", prep: "Wrap in paper or cardboard before placing in trash to protect waste workers.", instructions: "Ceramics and dishware are not glass and cannot be recycled with bottles and jars.", mistake: "Placing it in the glass recycling bin.", color: 'bg-red-700', text: 'text-red-700', keywords: ['ceramic', 'mug', 'cup', 'dish', 'bowl', 'pottery', 'dinnerware'] },
+            { name: "Used Paper Towels / Tissues", category: "Residual/Trash", material: "Contaminated Paper", prep: "If clean, can sometimes be composted. If used with chemicals or food waste, dispose of in trash.", instructions: "Paper fibers are too short or contaminated to be recycled.", mistake: "Attempting to recycle used paper towels.", color: 'bg-brown-600', text: 'text-brown-600', keywords: ['tissue', 'paper towel', 'napkin', 'towel', 'used paper'] },
+        ];
+
+        // Dataset configuration - Maps ACTUAL folder names to waste types
+        const DATASET_CONFIG = {
+            'plastic bottles': 'Plastic Bottle',
+            'aluminium beverage can': 'Aluminum Beverage Can',
+            'news paper': 'Newspaper / Office Paper',
+            'glass jar bottle': 'Glass Jar / Bottle',
+            'cardboard boxes': 'Cardboard Box',
+            'banana peel': 'Banana Peel / Apple Core',
+            'Coffee grounds or tea bags': 'Coffee Grounds / Tea Bags',
+            'Greasy pizza box': 'Greasy Pizza Box',
+            'Plastic grocery bag': 'Plastic Grocery Bag',
+            'Styrofoam': 'Styrofoam (Packing Peanuts)',
+            'Broken ceramic mug': 'Broken Ceramic Mug',
+            'Used paper towels or tissues': 'Used Paper Towels / Tissues'
+        };
+
+        // Store reference images for comparison
+        let imageDataset = {};
+        let datasetLoaded = false;
+
+        // Load all dataset images
+        async function loadDataset() {
+            if (datasetLoaded) return;
+            
+            console.log('🔄 Loading dataset images...');
+            const basePath = './dataset/images/';
+            
+            for (const [folderName, wasteType] of Object.entries(DATASET_CONFIG)) {
+                imageDataset[wasteType] = [];
+                
+                // Try to load images per type
+                for (let i = 1; i <= 4; i++) {
+                    const imagePath = `${basePath}${folderName}/${i}.jpg`;
+                    try {
+                        const response = await fetch(imagePath);
+                        if (response.ok) {
+                            imageDataset[wasteType].push(imagePath);
+                            console.log(`✓ Loaded: ${folderName}/${i}.jpg`);
+                        }
+                    } catch (error) {
+                        console.warn(`⚠ Could not load: ${folderName}/${i}.jpg`);
+                    }
+                }
+                
+                if (imageDataset[wasteType].length > 0) {
+                    console.log(`✓ Dataset ready for ${wasteType}: ${imageDataset[wasteType].length} images`);
+                }
+            }
+            
+            datasetLoaded = true;
+            console.log('✅ Dataset loading complete!', imageDataset);
+        }
+
+        // --- AI DETECTION FUNCTIONS ---
+
+        // Load the COCO-SSD model
+        async function loadModel() {
+            if (cocoModel) return cocoModel; // Already loaded
+            if (modelLoading) return null;
+            
+            modelLoading = true;
+            try {
+                console.log('Loading AI model...');
+                cocoModel = await cocoSsd.load();
+                console.log('AI model loaded successfully!');
+                return cocoModel;
+            } catch (error) {
+                console.error('Error loading model:', error);
+                modelLoading = false;
+                return null;
+            }
+        }
+
+        // Detect waste items in an image
+        async function detectWasteInImage(imageElement) {
+            try {
+                const model = await loadModel();
+                if (!model) return null;
+
+                const predictions = await model.detect(imageElement);
+                
+                if (!predictions || predictions.length === 0) {
+                    return null;
+                }
+
+                // Get detected object classes with confidence scores
+                const detectedClasses = predictions.map(p => ({
+                    class: p.class.toLowerCase(),
+                    score: p.score
+                }));
+                
+                console.log('Detected objects:', detectedClasses);
+
+                // TIER 1: Direct keyword matching (high confidence)
+                for (let detection of detectedClasses) {
+                    const detectedClass = detection.class;
+                    
+                    let match = WASTE_DATABASE.find(item => {
+                        const keywords = item.keywords || [];
+                        const name = item.name.toLowerCase();
+                        
+                        // Exact name match
+                        if (detectedClass === name) return true;
+                        
+                        // Check if detected class is IN item name
+                        if (name.includes(detectedClass)) return true;
+                        
+                        // Check if detected class EXACTLY matches any keyword
+                        if (keywords.includes(detectedClass)) return true;
+                        
+                        return false;
+                    });
+
+                    if (match) {
+                        console.log('Matched item (Tier 1 - Direct):', match.name);
+                        return match;
+                    }
+                }
+
+                // TIER 2: Partial matching (medium confidence)
+                for (let detection of detectedClasses) {
+                    const detectedClass = detection.class;
+                    
+                    let match = WASTE_DATABASE.find(item => {
+                        const keywords = item.keywords || [];
+                        
+                        // Check for partial keyword matches (both directions)
+                        for (let keyword of keywords) {
+                            // Only match if keyword is meaningful (at least 3 chars)
+                            if (keyword.length >= 3) {
+                                if (detectedClass.includes(keyword) || keyword.includes(detectedClass)) {
+                                    return true;
+                                }
+                            }
+                        }
+                        
+                        return false;
+                    });
+
+                    if (match) {
+                        console.log('Matched item (Tier 2 - Partial):', match.name);
+                        return match;
+                    }
+                }
+
+                // TIER 3: Smart type-based fallback (specific categories only)
+                for (let detection of detectedClasses) {
+                    const detectedClass = detection.class;
+                    
+                    // Only match EXACT detection class types to specific items
+                    if (detectedClass === 'bottle') {
+                        return WASTE_DATABASE.find(item => item.name === 'Plastic Bottle');
+                    }
+                    if (detectedClass === 'can') {
+                        return WASTE_DATABASE.find(item => item.name === 'Aluminum Beverage Can');
+                    }
+                    if (detectedClass === 'box') {
+                        return WASTE_DATABASE.find(item => item.name === 'Cardboard Box');
+                    }
+                }
+
+                return null;
+            } catch (error) {
+                console.error('Detection error:', error);
+                return null;
+            }
+        }
+
+        // Enhanced detection with dataset comparison
+        async function detectWasteInImageWithDataset(imageElement) {
+            try {
+                const model = await loadModel();
+                if (!model) return null;
+
+                const predictions = await model.detect(imageElement);
+                
+                if (!predictions || predictions.length === 0) {
+                    return null;
+                }
+
+                const detectedClasses = predictions.map(p => ({
+                    class: p.class.toLowerCase(),
+                    score: p.score
+                }));
+                
+                console.log('Detected objects:', detectedClasses);
+
+                // TIER 1: Direct keyword matching
+                for (let detection of detectedClasses) {
+                    const detectedClass = detection.class;
+                    
+                    let match = WASTE_DATABASE.find(item => {
+                        const keywords = item.keywords || [];
+                        const name = item.name.toLowerCase();
+                        
+                        if (detectedClass === name) return true;
+                        if (name.includes(detectedClass)) return true;
+                        if (keywords.includes(detectedClass)) return true;
+                        
+                        return false;
+                    });
+
+                    if (match) {
+                        console.log('Matched item (Tier 1):', match.name);
+                        return match;
+                    }
+                }
+
+                // TIER 2: Partial matching
+                for (let detection of detectedClasses) {
+                    const detectedClass = detection.class;
+                    
+                    let match = WASTE_DATABASE.find(item => {
+                        const keywords = item.keywords || [];
+                        
+                        for (let keyword of keywords) {
+                            if (keyword.length >= 3) {
+                                if (detectedClass.includes(keyword) || keyword.includes(detectedClass)) {
+                                    return true;
+                                }
+                            }
+                        }
+                        
+                        return false;
+                    });
+
+                    if (match) {
+                        console.log('Matched item (Tier 2):', match.name);
+                        return match;
+                    }
+                }
+
+                // TIER 3: Smart fallback
+                for (let detection of detectedClasses) {
+                    const detectedClass = detection.class;
+                    
+                    if (detectedClass === 'bottle') {
+                        return WASTE_DATABASE.find(item => item.name === 'Plastic Bottle');
+                    }
+                    if (detectedClass === 'can') {
+                        return WASTE_DATABASE.find(item => item.name === 'Aluminum Beverage Can');
+                    }
+                    if (detectedClass === 'box') {
+                        return WASTE_DATABASE.find(item => item.name === 'Cardboard Box');
+                    }
+                }
+
+                return null;
+            } catch (error) {
+                console.error('Detection error:', error);
+                return null;
+            }
+        }
+
+        // Load and configure MobileNet for feature extraction
+        let mobilenetModel = null;
+
+        async function loadMobileNetModel() {
+            if (mobilenetModel) return mobilenetModel;
+            try {
+                console.log('Loading MobileNet (mobilenet.load()) for feature extraction...');
+                mobilenetModel = await mobilenet.load();
+                console.log('MobileNet loaded for feature extraction!');
+                return mobilenetModel;
+            } catch (err) {
+                console.error('Error loading MobileNet:', err);
+                return null;
+            }
+        }
+
+        // Extract features from an image element using mobilenet.infer()
+        async function extractImageFeatures(imageElement) {
+            try {
+                const model = await loadMobileNetModel();
+                if (!model) return null;
+
+                // mobilenet.infer accepts an HTMLImageElement directly.
+                // The second arg `true` returns the embedding tensor instead of classification.
+                const activation = model.infer(imageElement, true);
+                const featuresArray = await activation.data();
+
+                activation.dispose();
+
+                return Array.from(featuresArray);
+            } catch (error) {
+                console.error('Error extracting features:', error);
+                return null;
+            }
+        }
+
+        // Calculate similarity between two feature vectors
+        function calculateSimilarity(features1, features2) {
+            if (!features1 || !features2) return 0;
+            
+            let dotProduct = 0;
+            let magnitude1 = 0;
+            let magnitude2 = 0;
+
+            for (let i = 0; i < features1.length; i++) {
+                dotProduct += features1[i] * features2[i];
+                magnitude1 += features1[i] * features1[i];
+                magnitude2 += features2[i] * features2[i];
+            }
+
+            magnitude1 = Math.sqrt(magnitude1);
+            magnitude2 = Math.sqrt(magnitude2);
+
+            if (magnitude1 === 0 || magnitude2 === 0) return 0;
+
+            return dotProduct / (magnitude1 * magnitude2);
+        }
+
+        // Pre-extract and cache dataset image features
+        let datasetFeatures = {};
+
+        async function preloadDatasetFeatures() {
+            console.log('Pre-loading dataset image features...');
+            
+            for (const [wasteType, imagePaths] of Object.entries(imageDataset)) {
+                datasetFeatures[wasteType] = [];
+                
+                for (const imagePath of imagePaths) {
+                    try {
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        
+                        await new Promise((resolve, reject) => {
+                            img.onload = resolve;
+                            img.onerror = reject;
+                            img.src = imagePath;
+                        });
+
+                        const features = await extractImageFeatures(img);
+                        if (features) {
+                            datasetFeatures[wasteType].push(features);
+                            console.log(`✓ Extracted features for ${wasteType}`);
+                        }
+                    } catch (error) {
+                        console.warn(`Could not extract features for ${imagePath}:`, error);
+                    }
+                }
+            }
+            
+            console.log('✅ Dataset features pre-loaded!', datasetFeatures);
+        }
+
+        // Enhanced detection using dataset image comparison
+        async function detectWasteUsingDataset(imageElement) {
+            try {
+                console.log('Detecting waste using dataset comparison...');
+                
+                // Extract features from uploaded image
+                const uploadedFeatures = await extractImageFeatures(imageElement);
+                if (!uploadedFeatures) {
+                    console.warn('Could not extract features from uploaded image');
+                    return null;
+                }
+
+                // Compare against all dataset images
+                let bestMatch = null;
+                let bestSimilarity = 0;
+
+                for (const [wasteType, featuresList] of Object.entries(datasetFeatures)) {
+                    for (const datasetFeatures of featuresList) {
+                        const similarity = calculateSimilarity(uploadedFeatures, datasetFeatures);
+                        
+                        if (similarity > bestSimilarity) {
+                            bestSimilarity = similarity;
+                            bestMatch = wasteType;
+                        }
+                    }
+                }
+
+                console.log(`Best match: ${bestMatch} with similarity ${bestSimilarity.toFixed(3)}`);
+
+                // Use a threshold - if similarity is too low, don't match
+                if (bestSimilarity < 0.45) {
+                    console.warn('Similarity too low, no reliable match found (bestSimilarity=' + bestSimilarity.toFixed(3) + ')');
+                    return null;
+                }
+
+                // Find the waste item in database
+                const result = WASTE_DATABASE.find(item => item.name === bestMatch);
+                return result || null;
+
+            } catch (error) {
+                console.error('Detection error:', error);
+                return null;
+            }
+        }
+
+        // --- Utility Functions ---
+
+        function saveToLocalStorage() {
+            localStorage.setItem('ecoSortHistory', JSON.stringify(history));
+            localStorage.setItem('ecoSortStats', JSON.stringify(stats));
+        }
+
+        if (Object.keys(stats).length === 0) {
+            stats = { totalItems: 0, recyclableCount: 0, compostableCount: 0, trashCount: 0 };
+            saveToLocalStorage();
+        }
+
+        function logClassification(item, category) {
+            const newEntry = {
+                item,
+                category,
+                timestamp: new Date().toLocaleString(),
+            };
+            history.unshift(newEntry);
+            if (history.length > 50) history.pop();
+
+            stats.totalItems = (stats.totalItems || 0) + 1;
+            if (category === 'Recyclable') stats.recyclableCount = (stats.recyclableCount || 0) + 1;
+            if (category === 'Compostable') stats.compostableCount = (stats.compostableCount || 0) + 1;
+            if (category === 'Residual/Trash') stats.trashCount = (stats.trashCount || 0) + 1;
+
+            saveToLocalStorage();
+        }
+
+        // --- Screen Rendering ---
+
+        function renderScreen(screenId) {
+            const content = document.getElementById('content');
+            content.className = 'flex-grow overflow-y-auto screen';
+
+            document.querySelectorAll('.nav-item').forEach(btn => {
+                const isCurrent = btn.id === `nav-${screenId}`;
+                btn.className = `flex flex-col items-center justify-center p-1 transition-colors duration-200 ${isCurrent ? 'text-blue-600' : 'text-gray-400'}`;
+            });
+
+            switch (screenId) {
+                case 'Camera':
+                    content.innerHTML = renderCameraCaptureScreen();
+                    attachCameraListeners();
+                    break;
+                case 'Results':
+                    content.innerHTML = renderClassificationResultsScreen(classificationResult);
+                    break;
+                case 'History':
+                    content.innerHTML = renderHistoryScreen();
+                    break;
+                case 'Browse':
+                    content.innerHTML = renderBrowseScreen();
+                    attachBrowseListeners();
+                    break;
+                case 'Stats':
+                    content.innerHTML = renderStatsDashboardScreen();
+                    break;
+                case 'Settings':
+                    content.innerHTML = renderSettingsScreen();
+                    attachSettingsListeners();
+                    break;
+            }
+            currentScreen = screenId;
+            content.scrollTop = 0;
+        }
+
+        function navigateTo(screenId) {
+            renderScreen(screenId);
+        }
+
+        // --- 1. Camera Capture Screen ---
+        function renderCameraCaptureScreen() {
+            const previewContent = selectedImageUrl ?
+                `<img id="imagePreview" src="${selectedImageUrl}" class="w-full h-full object-cover rounded-xl"/>` :
+                `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>`;
+
+            const promptText = selectedImageUrl ?
+                'Tap to REPLACE Image' :
+                'Tap to Capture/Select Waste Item';
+            
+            const isButtonDisabled = !document.getElementById('searchTerm')?.value && !selectedImageUrl;
+            const searchTermValue = document.getElementById('searchTerm')?.value || '';
+
+            return `
+                <div class="p-4 flex flex-col h-full">
+                    <div class="bg-white rounded-xl shadow-lg border border-gray-100 flex-grow flex flex-col items-center justify-center p-6 mb-6">
+                        <div class="w-full max-w-sm">
+                            <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Capture Waste Item</h2>
+                            
+                            <!-- Hidden File Input that triggers the device camera/gallery -->
+                            <input type="file" accept="image/*" capture="camera" id="imageInput" class="hidden"/>
+
+                            <div id="captureArea" class="h-48 w-full bg-gray-200 rounded-lg flex items-center justify-center relative overflow-hidden shadow-inner cursor-pointer transition-shadow hover:shadow-xl">
+                                ${previewContent}
+                                <div class="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                    <p id="captureText" class="text-white text-sm font-semibold p-2 rounded-lg bg-black/50">${promptText}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6">
+                                <input
+                                    type="text"
+                                    id="searchTerm"
+                                    placeholder="Enter item name or AI will detect..."
+                                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 shadow-inner"
+                                    value="${searchTermValue}"
+                                />
+                                <button
+                                    id="classifyButton"
+                                    class="flex items-center justify-center space-x-2 px-4 py-3 w-full mt-4 text-white font-semibold rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-[1.01] focus:outline-none focus:ring-4 ${isButtonDisabled ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'}"
+                                    ${isButtonDisabled ? 'disabled' : ''}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-zap"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                    <span>Classify Item</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-green-600 font-semibold mt-auto flex items-center justify-center p-2 bg-green-50 rounded-lg shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        AI Detection Enabled: Upload images to auto-detect waste items!
+                    </p>
+                </div>
+            `;
+        }
+
+        function attachCameraListeners() {
+            const imageInput = document.getElementById('imageInput');
+            const captureArea = document.getElementById('captureArea');
+            const classifyButton = document.getElementById('classifyButton');
+            const searchTermInput = document.getElementById('searchTerm');
+
+            captureArea.onclick = () => imageInput.click();
+            imageInput.onchange = handleImageSelect;
+
+            if(classifyButton) classifyButton.onclick = handleClassify;
+            if(searchTermInput) searchTermInput.addEventListener('input', updateClassifyButtonState);
+
+            if(searchTermInput) searchTermInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && classifyButton && !classifyButton.disabled) {
+                    handleClassify();
+                }
+            });
+            updateClassifyButtonState();
+        }
+
+        function updateClassifyButtonState() {
+            const searchTermInput = document.getElementById('searchTerm');
+            const classifyButton = document.getElementById('classifyButton');
+            if (!classifyButton) return;
+
+            const hasText = searchTermInput.value.trim().length > 0;
+            const isReady = hasText || selectedImageUrl;
+
+            classifyButton.disabled = !isReady;
+            classifyButton.className = `flex items-center justify-center space-x-2 px-4 py-3 w-full mt-4 text-white font-semibold rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-[1.01] focus:outline-none focus:ring-4 ${isReady ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' : 'bg-blue-400'}`;
+        }
+        
+        async function handleImageSelect(event) {
+            const file = event.target.files[0];
+            const captureArea = document.getElementById('captureArea');
+            
+            if (selectedImageUrl) URL.revokeObjectURL(selectedImageUrl);
+
+            if (file) {
+                selectedImageUrl = URL.createObjectURL(file);
+                
+                captureArea.innerHTML = `<img id="imagePreview" src="${selectedImageUrl}" class="w-full h-full object-cover rounded-xl"/>
+                    <div class="absolute inset-0 bg-black/30 flex items-center justify-center">
+                        <p id="captureText" class="text-white text-sm font-semibold p-2 rounded-lg bg-black/50">Detecting items with AI...</p>
+                    </div>`;
+
+                const searchTermInput = document.getElementById('searchTerm');
+                
+                // AI Detection using dataset
+                const img = document.getElementById('imagePreview');
+                img.onload = async () => {
+                    try {
+                        const detectedItem = await detectWasteUsingDataset(img);
+                        
+                        if (detectedItem) {
+                            searchTermInput.value = detectedItem.name;
+                            document.getElementById('captureText').textContent = `✓ Detected: ${detectedItem.name}`;
+                        } else {
+                            document.getElementById('captureText').textContent = 'No match found. Enter item name manually.';
+                        }
+                    } catch (error) {
+                        console.error('Detection error:', error);
+                        document.getElementById('captureText').textContent = 'Detection failed. Enter name.';
+                    }
+                };
+                
+                updateClassifyButtonState();
+            } else {
+                selectedImageUrl = null;
+                navigateTo('Camera'); 
+            }
+        }
+        
+        function findClassification(searchTerm) {
+            const normalizedSearchTerm = searchTerm.toLowerCase().trim();
+
+            if (!normalizedSearchTerm) return null;
+
+            const exactMatch = WASTE_DATABASE.find(item => item.name.toLowerCase() === normalizedSearchTerm);
+            if (exactMatch) return exactMatch;
+
+            const partialMatch = WASTE_DATABASE.find(item => 
+                item.name.toLowerCase().startsWith(normalizedSearchTerm) || 
+                item.name.toLowerCase().includes(normalizedSearchTerm) ||
+                (item.keywords && item.keywords.some(k => k.includes(normalizedSearchTerm)))
+            );
+            
+            if (partialMatch) return partialMatch;
+
+            return null;
+        }
+
+        function handleClassify() {
+            const input = document.getElementById('searchTerm');
+            const button = document.getElementById('classifyButton');
+
+            let searchTerm = input.value.trim();
+            
+            if (!searchTerm && !selectedImageUrl) {
+                return; 
+            }
+
+            button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rotate-cw animate-spin-slow mr-2"><path d="M20.2 12l-.9-1.9M19.3 15l-1.8-1M18.4 18l-1.7-.8M17.5 21l-1.6-.3M20.9 9l-.8-2.2M18 5l-2-.8M15 3l-2-.8M12 2v-.9M9 3l-2-.8M6 5l-2-.8M3.1 9l-.8-2.2"/></svg><span>Analyzing...</span>';
+            button.disabled = true;
+            input.disabled = true;
+
+            setTimeout(() => {
+                const result = findClassification(searchTerm);
+
+                if (result) {
+                    classificationResult = result;
+                    logClassification(result.name, result.category);
+                } else {
+                    classificationResult = {
+                        name: searchTerm || 'Unidentified Item',
+                        category: "Unknown",
+                        material: "Mixed/Unidentified",
+                        prep: "We couldn't identify this item. Please use the guide/search feature, or dispose of it in the Residual/Trash bin if unsure.",
+                        instructions: "Safety first! When in doubt, throw it out. Avoid contaminating a recycling batch.",
+                        mistake: "Unidentified item.",
+                        color: 'bg-purple-600',
+                        text: 'text-purple-600'
+                    };
+                    logClassification(searchTerm || 'Unidentified Item', "Unknown");
+                }
+
+                // Clean up the object URL after classification
+                if (selectedImageUrl) URL.revokeObjectURL(selectedImageUrl);
+                selectedImageUrl = null;
+                
+                // Clear the search term input visually
+                if(input) input.value = '';
+
+                navigateTo('Results'); 
+            }, 1500);
+        }
+
+        // --- 2. Classification Results Screen ---
+        function getIconSVG(category) {
+            switch (category) {
+                case 'Recyclable': return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>';
+                case 'Compostable': return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-lime-600"><path d="M2 12L7 7L12 12"/><path d="M7 12V22"/><path d="M17 12l-5 5-5-5"/><path d="M17 12l-5-5-5 5"/></svg>';
+                case 'Residual/Trash': return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+                default: return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple-600"><path d="m21.73 18-8-14c-.6-.7-1.63-.6-2.23.1L2 18"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+            }
+        }
+
+        function getCategoryStyles(category) {
+            switch (category) {
+                case 'Recyclable': return 'text-green-800 bg-green-100 border-green-400';
+                case 'Compostable': return 'text-lime-800 bg-lime-100 border-lime-400';
+                case 'Residual/Trash': return 'text-red-800 bg-red-100 border-red-400';
+                default: return 'text-purple-800 bg-purple-100 border-purple-400';
+            }
+        }
+
+        function renderClassificationResultsScreen(result) {
+            return `
+                <div class="p-4 overflow-y-auto screen">
+                    <h1 class="text-3xl font-extrabold text-gray-900 mb-4">Classification Result</h1>
+
+                    <div class="p-5 bg-white rounded-xl shadow-lg border border-gray-100 mb-6">
+                        <div class="flex items-center space-x-4 mb-3">
+                            ${getIconSVG(result.category)}
+                            <h2 class="text-2xl font-bold text-gray-800">${result.name}</h2>
+                        </div>
+                        <p class="inline-block px-3 py-1 text-sm font-semibold rounded-full border ${getCategoryStyles(result.category)}">
+                            ${result.category}
+                        </p>
+                    </div>
+
+                    <!-- General Guidance Section -->
+                    <div class="p-5 bg-white rounded-xl shadow-lg border-l-4 border-blue-500 mb-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-3 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 text-blue-500"><path d="M21 12H3"/><path d="M10 2l2 4M12 4l2-4"/><path d="M10 22l2-4M12 20l2 4"/></svg>
+                            General Disposal Guide
+                        </h3>
+                        <div class="space-y-4 text-gray-700">
+                            <div>
+                                <p class="font-semibold text-sm text-gray-500 uppercase">Material Identified:</p>
+                                <p class="font-medium">${result.material}</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-500 uppercase">Preparation Steps:</p>
+                                <p class="font-medium">${result.prep}</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-sm text-gray-500 uppercase">Disposal Instruction:</p>
+                                <p class="font-medium">${result.instructions}</p>
+                            </div>
+                            ${result.mistake ? `
+                                <div class="p-3 bg-yellow-50 rounded-lg border border-yellow-300">
+                                    <p class="font-bold text-sm text-yellow-800 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><path d="m21.73 18-8-14c-.6-.7-1.63-.6-2.23.1L2 18"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                                        Common Mistake:
+                                    </p>
+                                    <p class="text-sm text-yellow-700">${result.mistake}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Disclaimer -->
+                    <div class="p-5 bg-red-50 rounded-xl shadow-lg border-l-4 border-red-500 mb-6">
+                        <p class="font-bold text-red-700 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="m21.73 18-8-14c-.6-.7-1.63-.6-2.23.1L2 18"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                            LOCAL RULE DISCLAIMER
+                        </p>
+                        <p class="text-sm text-red-600 mt-1">
+                            The instructions above are generalized. *Always check your local municipality's official guidelines* as recycling rules vary significantly by location and facility.
+                        </p>
+                    </div>
+
+                    <button onclick="navigateTo('Camera')" class="flex items-center justify-center space-x-2 px-4 py-3 w-full mt-4 text-white font-semibold rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-[1.01] focus:outline-none focus:ring-4 bg-green-600 hover:bg-green-700 focus:ring-green-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rotate-cw"><path d="M21.5 2v-1.5M21.5 2h-1.5m-3 10a7 7 0 1 1-7-7"/></svg>
+                        <span>Scan Another Item</span>
+                    </button>
+                    <div class='flex justify-center text-sm text-gray-500 mt-3 pb-4'>
+                        <button onclick="alert('Thank you for your feedback! This data helps us improve the AI model.')" class='underline hover:text-red-500 transition'>
+                            Report Incorrect Classification
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- 3. Classification History Screen ---
+        function renderHistoryScreen() {
+            let historyHtml = history.map(item => `
+                <div class="p-4 bg-white rounded-xl shadow-md border border-gray-100">
+                    <div class="flex justify-between items-center">
+                        <div class="font-semibold text-lg text-gray-800">${item.item}</div>
+                        <div class="px-3 py-1 text-xs font-bold rounded-full ${getCategoryStyles(item.category)}">
+                            ${item.category}
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">${item.timestamp}</p>
+                </div>
+            `).join('');
+
+            if (history.length === 0) {
+                historyHtml = `
+                    <div class="p-5 bg-white rounded-xl shadow-lg border border-gray-100">
+                        <p class="text-center text-gray-500">No items classified yet. Scan an item to see your history here!</p>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="p-4 overflow-y-auto screen">
+                    <h1 class="text-3xl font-extrabold text-gray-900 mb-6">Classification History</h1>
+                    <div class="space-y-3">
+                        ${historyHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- 4. Statistics Dashboard Screen ---
+        function renderStatsDashboardScreen() {
+            const { totalItems = 0, recyclableCount = 0, compostableCount = 0, trashCount = 0 } = stats;
+
+            const recyclablePct = totalItems > 0 ? ((recyclableCount / totalItems) * 100).toFixed(1) : 0;
+            const compostablePct = totalItems > 0 ? ((compostableCount / totalItems) * 100).toFixed(1) : 0;
+            const trashPct = totalItems > 0 ? ((trashCount / totalItems) * 100).toFixed(1) : 0;
+
+            const data = [
+                { label: 'Recycled', count: recyclableCount, color: 'bg-green-500', percent: recyclablePct },
+                { label: 'Composted', count: compostableCount, color: 'bg-lime-500', percent: compostablePct },
+                { label: 'Residual', count: trashCount, color: 'bg-red-500', percent: trashPct },
+            ];
+
+            const barChartHtml = data.map(item => `
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-semibold text-gray-700 flex items-center">
+                            <span class="w-3 h-3 rounded-full ${item.color} mr-2"></span>
+                            ${item.label} (${item.count})
+                        </span>
+                        <span class="font-bold text-gray-800">${item.percent}%</span>
+                    </div>
+                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                            class="${item.color} h-full transition-all duration-500 ease-out"
+                            style="width: ${item.percent}%"
+                        ></div>
+                    </div>
+                </div>
+            `).join('');
+
+
+            return `
+                <div class="p-4 overflow-y-auto screen">
+                    <h1 class="text-3xl font-extrabold text-gray-900 mb-6">Your Impact Dashboard</h1>
+
+                    <div class="p-5 bg-white rounded-xl shadow-lg border border-gray-100 mb-6 text-center">
+                        <h2 class="text-5xl font-extrabold text-blue-600">${totalItems}</h2>
+                        <p class="text-lg text-gray-600 mt-1">Total Items Classified</p>
+                        <p class="text-xs text-gray-400 mt-2">Data saved in your browser's local storage.</p>
+                    </div>
+
+                    <h2 class="text-xl font-bold text-gray-800 mb-3">Breakdown by Category</h2>
+                    <div class="p-5 bg-white rounded-xl shadow-lg border border-gray-100">
+                        ${barChartHtml}
+                    </div>
+
+                    <h2 class="text-xl font-bold text-gray-800 mt-6 mb-3">Recycling Goal</h2>
+                    <div class="p-5 bg-blue-50 rounded-xl border border-blue-200 shadow-md">
+                        <p class='text-blue-700 font-medium'>Keep it up! Your current recyclable rate is *${recyclablePct}%*. Try to minimize your residual waste (Trash) count.</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- 5. Waste Categories Browse Screen ---
+        function renderBrowseScreen(filter = '') {
+            const normalizedFilter = filter.toLowerCase();
+            const filteredItems = WASTE_DATABASE.filter(item =>
+                item.name.toLowerCase().includes(normalizedFilter) ||
+                item.category.toLowerCase().includes(normalizedFilter) ||
+                item.material.toLowerCase().includes(normalizedFilter)
+            );
+
+            const itemsHtml = filteredItems.map(item => `
+                <div class="p-4 bg-white rounded-xl shadow-md border border-gray-100 hover:shadow-xl transition duration-300">
+                    <div class="flex justify-between items-start mb-2">
+                        <h2 class="text-xl font-bold text-gray-800">${item.name}</h2>
+                        <span class="px-3 py-1 text-xs font-bold rounded-full ${getCategoryStyles(item.category)}">
+                            ${item.category}
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-2">
+                        <span class="font-semibold">Material:</span> ${item.material}
+                    </p>
+                    <p class="text-sm text-gray-700">
+                        <span class="font-semibold">Prep:</span> ${item.prep}
+                    </p>
+                    <p class="text-sm font-medium text-gray-900 mt-2">
+                        <span class="font-semibold">Action:</span> ${item.instructions}
+                    </p>
+                </div>
+            `).join('');
+
+            const emptyState = filteredItems.length === 0 ? `
+                <div class="p-5 bg-white rounded-xl shadow-lg border border-gray-100">
+                    <p class="text-center text-gray-500">No matching items found.</p>
+                </div>
+            ` : '';
+
+            return `
+                <div class="p-4 overflow-y-auto screen">
+                    <h1 class="text-3xl font-extrabold text-gray-900 mb-4">Waste Categories Guide</h1>
+
+                    <div class="mb-6 relative">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        <input
+                            type="text"
+                            id="browseSearchInput"
+                            placeholder="Search item, material, or category..."
+                            value="${filter}"
+                            class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 shadow-inner"
+                        />
+                    </div>
+
+                    <p class="text-sm text-red-500 font-semibold mb-4 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><path d="m21.73 18-8-14c-.6-.7-1.63-.6-2.23.1L2 18"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                        Showing General Guidelines only.
+                    </p>
+
+                    <div id="browseList" class="space-y-4">
+                        ${itemsHtml}
+                        ${emptyState}
+                    </div>
+                </div>
+            `;
+        }
+
+        function attachBrowseListeners() {
+            document.getElementById('browseSearchInput').addEventListener('input', (e) => {
+                const filter = e.target.value;
+                const listContainer = document.getElementById('browseList');
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = renderBrowseScreen(filter);
+                listContainer.innerHTML = tempDiv.querySelector('#browseList').innerHTML;
+            });
+        }
+
+        // --- 6. Settings Screen ---
+        function renderSettingsScreen() {
+            return `
+                <div class="p-4 overflow-y-auto screen">
+                    <h1 class="text-3xl font-extrabold text-gray-900 mb-6">App Settings & Info</h1>
+
+                    <div class="p-5 bg-white rounded-xl shadow-lg border border-gray-100 mb-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-3">Data & Storage</h2>
+                        <div class="text-sm text-gray-600 space-y-2">
+                            <p><strong>Storage Method:</strong> Browser Local Storage</p>
+                            <p><strong>Data Saved:</strong> Classification History & Statistics</p>
+                            <p class="text-xs text-red-500">Note: Clearing your browser cache will delete all history and stats.</p>
+                        </div>
+                        <button id="clearDataButton" class="flex items-center justify-center space-x-2 px-4 py-2 mt-4 text-white font-semibold rounded-lg shadow-md transition duration-200 ease-in-out bg-red-600 hover:bg-red-700 w-full text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            Clear All Local History & Stats
+                        </button>
+                    </div>
+
+                    <div class="p-5 bg-blue-50 rounded-xl shadow-lg border-l-4 border-blue-500 mb-6">
+                        <h2 class="text-xl font-bold text-blue-800 mb-2">AI Detection Features</h2>
+                        <p class="text-sm text-blue-700">
+                            <strong>TensorFlow.js + COCO-SSD</strong> is used to automatically detect waste items from images. No data is sent to any server - everything runs locally in your browser!
+                        </p>
+                    </div>
+
+                    <h2 class="text-xl font-bold text-gray-800 mb-3">Legal & Support</h2>
+
+                    <div class="space-y-3">
+                        <button onclick="showModal('Disclaimer')" class="flex items-center justify-center space-x-2 px-4 py-3 text-gray-700 bg-gray-200 hover:bg-gray-300 w-full font-semibold rounded-lg shadow-md transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14c-.6-.7-1.63-.6-2.23.1L2 18"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                            General Guide Disclaimer
+                        </button>
+                        <button onclick="showModal('Privacy')" class="flex items-center justify-center space-x-2 px-4 py-3 text-gray-700 bg-gray-200 hover:bg-gray-300 w-full font-semibold rounded-lg shadow-md transition">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 0 0-9.09 14.85l3.52-3.52A6 6 0 1 1 12 18V12"/><path d="M17 12a5 5 0 0 0-5-5M12 2v4"/></svg>
+                            Privacy Policy (Simulated)
+                        </button>
+                        <button onclick="alert('Contact support at support@eco-sort.com')" class="flex items-center justify-center space-x-2 px-4 py-3 text-gray-700 bg-gray-200 hover:bg-gray-300 w-full font-semibold rounded-lg shadow-md transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m18 15-6 6-6-6"/><path d="M12 2v19"/></svg>
+                            Contact Support
+                        </button>
+                    </div>
+                </div>
+                ${renderModal()}
+            `;
+        }
+
+        function attachSettingsListeners() {
+            document.getElementById('clearDataButton').onclick = function() {
+                if (window.confirm("Are you sure you want to clear ALL history and statistics? This cannot be undone.")) {
+                    localStorage.removeItem('ecoSortHistory');
+                    localStorage.removeItem('ecoSortStats');
+                    history = [];
+                    stats = { totalItems: 0, recyclableCount: 0, compostableCount: 0, trashCount: 0 };
+                    navigateTo('Settings');
+                }
+            };
+        }
+
+        // --- Modal Component ---
+        function renderModal() {
+            return `
+                <div id="modalContainer" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+                    <div id="modalContent" class="max-w-md w-full p-6 bg-white rounded-xl shadow-2xl">
+                        <!-- Content injected here -->
+                    </div>
+                </div>
+            `;
+        }
+
+        function showModal(type) {
+            const container = document.getElementById('modalContainer');
+            const content = document.getElementById('modalContent');
+            let title, body;
+
+            if (type === 'Disclaimer') {
+                title = '<h3 class="text-2xl font-bold text-red-600 mb-3 flex items-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="m21.73 18-8-14c-.6-.7-1.63-.6-2.23.1L2 18"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>CRITICAL DISCLAIMER</h3>';
+                body = `
+                    <p class="text-gray-700 mb-4">This application uses *generalized, national recycling best practices* for classification.</p>
+                    <p class="text-sm text-gray-600 mb-4">Recycling rules are *highly localized* and change based on your specific city and facility. The instruction to "Recycle" or "Compost" is a *suggestion*, not a local mandate.</p>
+                    <p class="text-sm font-bold text-red-700">You MUST verify these instructions with your local waste management provider.</p>
+                `;
+            } else if (type === 'Privacy') {
+                title = '<h3 class="text-2xl font-bold text-blue-600 mb-3 flex items-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M12 2a10 10 0 0 0-9.09 14.85l3.52-3.52A6 6 0 1 1 12 18V12"/><path d="M17 12a5 5 0 0 0-5-5M12 2v4"/></svg>Privacy Policy (Simulated)</h3>';
+                body = `
+                    <p class="text-gray-700 mb-4">We are committed to protecting your privacy. This prototype uses *Local Storage* in your browser to save your history and statistics.</p>
+                    <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
+                        <li>We do not collect personal identifying information (PII).</li>
+                        <li>AI detection runs locally - no images sent to servers.</li>
+                        <li>Any "classification correction" feedback is anonymous.</li>
+                    </ul>
+                `;
+            }
+
+            content.innerHTML = `
+                ${title}
+                ${body}
+                <button onclick="hideModal()" class="flex items-center justify-center space-x-2 px-4 py-3 w-full mt-4 text-white font-semibold rounded-lg shadow-md transition bg-blue-600 hover:bg-blue-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    Close
+                </button>
+            `;
+            container.classList.remove('hidden');
+        }
+
+        function hideModal() {
+            document.getElementById('modalContainer').classList.add('hidden');
+        }
+
+        // Initial render
+        window.onload = async () => {
+            if (!document.getElementById('modalContainer')) {
+                document.body.insertAdjacentHTML('beforeend', renderModal());
+            }
+            await loadDataset();  // Load your images
+            await preloadDatasetFeatures();  // Pre-extract dataset image features
+            loadModel(); // Pre-load AI model
+            navigateTo('Camera');
+        };
+    </script>
+</body>
+</html>
